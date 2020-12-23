@@ -34,6 +34,7 @@ type
     FResourceCount: IOmniResourceCount;
     FSharedValue: int64;
     FSync: TOmniSynchronizer;
+    FSystemMutex: TMutex;
   {$IFDEF OTL_Generics}
     FSingleton: TSingleton;
     FSingletonIntf: ISingleton;
@@ -134,7 +135,7 @@ var
   count  : TOmniAlignedInt32;
   i      : integer;
   mrew   : TOmniMREW;
-  readers: TArray<IOmniTaskControl>;
+  readers: array of IOmniTaskControl;
   time   : int64;
 begin
   // Tests whether multiple readers can quire the lock at the same time
@@ -166,7 +167,7 @@ var
   count  : TOmniAlignedInt32;
   i      : integer;
   mrew   : TOmniMREW;
-  readers: TArray<IOmniTaskControl>;
+  readers: array of IOmniTaskControl;
   time   : int64;
 begin
   // Tests whether multiple readers can quire the lock at the same time
@@ -199,7 +200,7 @@ var
   count  : TOmniAlignedInt32;
   i      : integer;
   mrew   : TOmniMREW;
-  readers: TArray<IOmniTaskControl>;
+  readers: array of IOmniTaskControl;
 begin
   // Tests whether a reader will acquire a lock if it is initially blocked
 
@@ -244,8 +245,8 @@ var
   count  : TOmniAlignedInt32;
   i      : integer;
   mrew   : TOmniMREW;
-  readers: TArray<IOmniTaskControl>;
-  times  : TArray<int64>;
+  readers: array of IOmniTaskControl;
+  times  : array of int64;
 
   function MakeTask(idx: integer): TOmniTaskDelegate;
   begin
@@ -288,7 +289,7 @@ begin
   finally mrew.ExitWriteLock; end;
 
   for i := Low(readers) to High(readers) do
-    CheckTrue((times[i] > (CTimeout * 0.5)) and (times[i] < (CTimeout * 1.5)),
+    CheckTrue((times[i] > (CTimeout * 0.8)) and (times[i] < (CTimeout * 3)),
       Format('Reader #%d waited %d ms instead of %d ms', [i, times[i], CTimeout]));
 
   if not mrew.TryEnterReadLock(0) then
@@ -307,7 +308,7 @@ var
   hwm    : TOmniAlignedInt32;
   i      : integer;
   mrew   : TOmniMREW;
-  writers: TArray<IOmniTaskControl>;
+  writers: array of IOmniTaskControl;
 begin
   // Tests whether multiple writers cannot quire the lock at the same time
 
@@ -339,7 +340,7 @@ var
   count  : TOmniAlignedInt32;
   i      : integer;
   mrew   : TOmniMREW;
-  writers: TArray<IOmniTaskControl>;
+  writers: array of IOmniTaskControl;
 begin
   // Tests whether a writer will acquire a lock if it is initially blocked
 
@@ -383,7 +384,7 @@ var
   hwm    : TOmniAlignedInt32;
   i      : integer;
   mrew   : TOmniMREW;
-  writers: TArray<IOmniTaskControl>;
+  writers: array of IOmniTaskControl;
 begin
   // Tests whether multiple writers cannot quire the lock at the same time
 
@@ -421,8 +422,8 @@ var
   count  : TOmniAlignedInt32;
   i      : integer;
   mrew   : TOmniMREW;
-  writers: TArray<IOmniTaskControl>;
-  times  : TArray<int64>;
+  writers: array of IOmniTaskControl;
+  times  : array of int64;
 
   function MakeTask(idx: integer): TOmniTaskDelegate;
   begin
@@ -465,7 +466,7 @@ begin
   finally mrew.ExitReadLock; end;
 
   for i := Low(writers) to High(writers) do
-    CheckTrue((times[i] > (CTimeout * 0.5)) and (times[i] < (CTimeout * 1.5)),
+    CheckTrue((times[i] > (CTimeout * 0.8)) and (times[i] < (CTimeout * 3)),
       Format('Writer #%d waited %d ms instead of %d ms', [i, times[i], CTimeout]));
 
   if not mrew.TryEnterReadLock(0) then
@@ -485,8 +486,8 @@ var
   count  : TOmniAlignedInt32;
   i      : integer;
   mrew   : TOmniMREW;
-  writers: TArray<IOmniTaskControl>;
-  times  : TArray<int64>;
+  writers: array of IOmniTaskControl;
+  times  : array of int64;
 
   function MakeTask(idx: integer): TOmniTaskDelegate;
   begin
@@ -529,7 +530,7 @@ begin
   finally mrew.ExitWriteLock; end;
 
   for i := Low(writers) to High(writers) do
-    CheckTrue((times[i] > (CTimeout * 0.5)) and (times[i] < (CTimeout * 1.5)),
+    CheckTrue((times[i] > (CTimeout * 0.8)) and (times[i] < (CTimeout * 3)),
       Format('Writer #%d waited %d ms instead of %d ms', [i, times[i], CTimeout]));
 
   if not mrew.TryEnterReadLock(0) then
@@ -649,10 +650,14 @@ procedure TestOtlSync.SetUp;
 begin
   inherited;
   FSync := TOmniSynchronizer.Create;
+  FSystemMutex := TMutex.Create(nil, false, '/OmniThreadLibrary/TestOtlSync/A4EDD8C0-88D0-46A9-890B-8EAAF466C44A');
+  FSystemMutex.Acquire
 end;
 
 procedure TestOtlSync.TearDown;
 begin
+  FSystemMutex.Release;
+  FreeAndNil(FSystemMutex);
   FreeAndNil(FSync);
   inherited;
 end;
